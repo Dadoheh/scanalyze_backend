@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.env
+.venv
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logi
+*.log
+logs/
+
+# Bazy danych
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker
+.docker/
+
+# Dokumentacja
+docs/_build/
+site/
+
+# Pliki konfiguracyjne zawierające potencjalnie wrażliwe dane
+config.json
+secrets.json
+credentials.json
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
