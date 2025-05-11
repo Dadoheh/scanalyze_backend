@@ -9,6 +9,8 @@ services:
       - mongo
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - MONGO_URI=mongodb://mongo:27055
     networks:

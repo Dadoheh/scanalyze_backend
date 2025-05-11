@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.routes import auth
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes import auth, user
 
 app = FastAPI()
 
@@ -14,3 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, tags=["auth"])
+app.include_router(user.router, prefix="/user", tags=["user"])
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Scanalyze API"}
