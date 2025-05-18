@@ -34,9 +34,10 @@ class UserProfileIn(BaseModel):
     otherMedications: Optional[str] = None
     medicalProcedures: Optional[str] = None
     
-    smoking: Optional[bool] = None
-    stressLevel: Optional[str] = None
-    tanning: Optional[bool] = None
+    smoking: Optional[str] = None
+    stressLevel: Optional[int] = None
+    tanning: Optional[str] = None
+    pregnancy: Optional[bool] = None
 
 class UserProfileOut(UserProfileIn):
     pass
