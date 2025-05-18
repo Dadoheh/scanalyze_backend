@@ -27,7 +27,13 @@ async def update_user_profile(
             detail="Użytkownik nie znaleziony"
         )
     
-    profile_dict = profile.dict(exclude_none=True)
+    profile_dict = profile.model_dump()  # dict is deprecated, use model_dump()
+    
+    for key, value in profile_dict.items(): # TODO Check why doesnt see atopicSkin
+        if value is None:
+            if key in user and isinstance(user[key], bool): # ? 
+                profile_dict[key] = False
+            
     
     # Aktualizacja dokumentu użytkownika
     await users_collection.update_one(
@@ -36,4 +42,5 @@ async def update_user_profile(
     )
     
     updated_user = await users_collection.find_one({"email": current_user["email"]})
+    print(f"Updated user: {updated_user}")
     return updated_user
