@@ -4,7 +4,7 @@ services:
   backend:
     build: .
     ports:
-      - "8000:8000"
+      - "9091:8000"
     depends_on:
       - mongo
     volumes:
