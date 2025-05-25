@@ -157,7 +157,7 @@ python -m pytest tests/routes/test_user_profile.py -v
 
 ## Frontend Integration
 
-This backend is designed to work with the Scanalyze Flutter application: https://github.com/Dadoheh/scanalyze, which provides a user-friendly interface for:
+This backend is designed to work with the Scanalyze Flutter application, which provides a user-friendly interface for:
 
 - User registration and authentication  
 - Detailed skin profile creation  
