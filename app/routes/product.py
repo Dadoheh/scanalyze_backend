@@ -8,12 +8,15 @@ import cv2
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from ..core.auth import get_current_user
 from ..core.database import users_collection
+from ..service.ingredients_cleaner import IngredientsCleaner
 
 router = APIRouter(prefix="/product", tags=["product"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/analyze")
+ingredientsCleaner = IngredientsCleaner()
+
+@router.post("/extract-text")
 async def analyze_product_image(
     image: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
@@ -46,24 +49,19 @@ async def analyze_product_image(
         #     cv2.THRESH_BINARY, 11, 2
         # )
         
-        # extracted_text = pytesseract.image_to_string(thresh, lang='eng+pol')
-        # print(f"Rozpoznany tekst: {extracted_text}")
         
         extracted_text = pytesseract.image_to_string(img, lang='eng+pol')
         print(f"Rozpoznany tekst: {extracted_text}")
         
-        # ingredients = extract_ingredients_from_text(extracted_text)
+        ingredients = ingredientsCleaner.extract_ingredients_from_text(extracted_text)
         
-        # user_profile = await users_collection.find_one({"email": current_user["email"]})
-        # analysis_result = analyze_ingredients(ingredients, user_profile)
+        return {
+            "raw_text": extracted_text,
+            "extracted_ingredients": ingredients,
+            "file_id": unique_filename,
+        }
         
-        # return {
-        #     "ingredients": analysis_result["ingredients"],
-        #     "compatibility_score": analysis_result["compatibility_score"],
-        #     "recommendation": analysis_result["recommendation"],
-        #     "file_saved": file_path
-        # }
-        
+       
     except Exception as e:
         if 'file_path' in locals() and os.path.exists(file_path):
             os.remove(file_path)
@@ -73,17 +71,35 @@ async def analyze_product_image(
             detail=f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}"
         )
         
-"""# Mocked result
-        # mock_result = {
-        #     "ingredients": [
-        #         {"name": "Aqua", "description": "Woda", "risk_level": "low"},
-        #         {"name": "Glycerin", "description": "Gliceryna (Nawilżenie)", "risk_level": "low"},
-        #         {"name": "Sodium Laureth Sulfate", "description": "Surfaktant", "risk_level": "medium"},
-        #         {"name": "Parfum", "description": "Substancja zapachowa", "risk_level": "high"}
-        #     ],
-        #     "compatibility_score": 0.75,
-        #     "recommendation": "Ten kosmetyk może być odpowiedni dla Twojego typu skóry.",
-        #     "file_saved": file_path
-        # }
-        
-        # return mock_result"""
+@router.post("/analyze-ingredients")
+async def analyze_ingredients(
+    ingredients_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Analyzes confirmed ingredients against user profile.
+
+    Args:
+        ingredients_data (dict): _description_
+        current_user (dict, optional): _description_. Defaults to Depends(get_current_user).
+    """
+    confirmed_ingredients = ingredients_data.get("confirmed_ingredients", [])
+    if not confirmed_ingredients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Brak potwierdzonych składników do analizy."
+        )
+    user_profile = await users_collection.find_one({"email": current_user["email"]})
+    
+    analyzed_ingredients = []
+    
+    # MOCK
+    recommendation = "Ten produkt może być odpowiedni dla Twojego typu skóry."
+    if any(item["risk_level"] == "high" for item in analyzed_ingredients):
+        recommendation = "Ten produkt zawiera składniki, które mogą nie być odpowiednie dla Twojej skóry."
+    compatibility_score = 0
+    
+    return {
+        "ingredients": analyzed_ingredients,
+        "compatibility_score": compatibility_score,
+        "recommendation": recommendation
+    }
