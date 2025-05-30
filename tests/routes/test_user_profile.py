@@ -1,9 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest import mock
 
 from main import app
-from app.core.auth import get_current_user, SECRET_KEY
+from app.core.auth import get_current_user
 
 client = TestClient(app)
 
