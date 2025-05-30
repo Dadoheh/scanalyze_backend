@@ -1,10 +1,8 @@
 import re
 from typing import List
 
-# WHY 'benzyl salicylate', 'parfum. ww'] WW AT THE END?
 
 class IngredientsCleaner:
-    # Lista typowych słów wprowadzających listę składników
     INGREDIENTS_MARKERS = [
         "ingredients:", "ingredients", "składniki:", "składniki", "inci:", "inci",
         "zawiera:", "zawiera", "skład:", "skład", "contains:", "contains"
@@ -55,9 +53,6 @@ class IngredientsCleaner:
             
             if len(ingredient) < 3:
                 continue
-                
-            
-            # WHY 'benzyl salicylate', 'parfum. ww'] WW AT THE END?
             
             if ingredient and not any(stop_word in ingredient for stop_word in ["www.", ".com", "uwagi", "note:", "przyp"]):
                 clean_ingredients.append(ingredient)
@@ -77,21 +72,3 @@ class IngredientsCleaner:
         
         return text
     
-    
-    # def analyze_ingredients(self, ingredients: List[str], user_profile: Dict[str, Any]) -> Dict[str, Any]:
-    #     """
-        
-    #     Args:
-            
-    #     Returns:
-    #     """
-    #     analyzed_ingredients = []
-    #     compatibility_score = 0
-    #     recommendation = "Brak rekomendacji"
-       
-    #     return {
-    #         "ingredients": analyzed_ingredients,
-    #         "compatibility_score": compatibility_score,
-    #         "recommendation": recommendation
-    #     }
-        
