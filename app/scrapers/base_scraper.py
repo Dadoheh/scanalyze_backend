@@ -101,3 +101,4 @@ class BaseScraper(abc.ABC):
             Dictionary with ingredient data
         """
         pass
+    
