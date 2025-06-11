@@ -33,3 +33,5 @@ uvicorn==0.34.1
 pytesseract==0.3.10
 opencv-python==4.7.0.72
 numpy==1.24.2
+beautifulsoup4==4.12.2
+lxml==4.9.3

@@ -63,8 +63,10 @@ class PubChemScraper(BaseScraper):
             "confidence_score": 0.8
         }
         
+    
         if properties.get("PropertyTable", {}).get("Properties"):
             prop = properties["PropertyTable"]["Properties"][0]
+                
             result.update({
                 "smiles": prop.get("CanonicalSMILES"),
                 "inchi": prop.get("InChI"),

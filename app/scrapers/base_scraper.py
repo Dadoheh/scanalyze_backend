@@ -54,7 +54,6 @@ class BaseScraper(abc.ABC):
         elapsed = now - self.last_request_time
         if elapsed < self.rate_limit:
             delay = self.rate_limit - elapsed + random.uniform(0.1, 0.3)  # Add jitter
-            logger.debug(f"Rate limiting: sleeping for {delay:.2f} seconds")
             await asyncio.sleep(delay)
         
         self.last_request_time = time.time()
