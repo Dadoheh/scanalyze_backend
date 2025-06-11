@@ -11,6 +11,8 @@ class ChemicalIdentityMapper:
         self.scrapers = [
             ("pubchem", PubChemScraper),
             # ("comptox", CompToxScraper),  # Will be added later
+            # ("chebi", ChEBIScraper), - check if provides API
+            # ("echa", ECHAScraper),  - as above
         ]
     
     async def map_ingredient(self, inci_name: str) -> ChemicalIdentityResult:
@@ -31,11 +33,12 @@ class ChemicalIdentityMapper:
             result.sources_checked.append(source_name)
             
             try:
-                async with scraper_class() as scraper:
+                async with scraper_class() as scraper: # Need to find a better way to gather information for the ingredient 
+                    # - as some websites contain A informations, and some other websites contain B information 
+                    #- we need to add every information into one/or more pydantic base models - not try/except any??
                     data = await scraper.search_by_name(inci_name)
                     
                     if data.get("found", False):
-                        # Successfully found data
                         identifiers = ChemicalIdentifiers(
                             inci_name=inci_name,
                             cas_number=data.get("cas_number"),
@@ -52,7 +55,7 @@ class ChemicalIdentityMapper:
                         
                         result.identifiers = identifiers
                         result.found = True
-                        break  # Stop at first successful result
+                        break
                         
             except Exception as e:
                 result.errors.append(f"{source_name}: {str(e)}")
@@ -72,7 +75,6 @@ class ChemicalIdentityMapper:
         Returns:
             List of mapping results
         """
-        # Process in batches to avoid overwhelming external APIs
         batch_size = 5
         results = []
         
@@ -81,10 +83,8 @@ class ChemicalIdentityMapper:
             batch_tasks = [self.map_ingredient(name) for name in batch]
             batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
             
-            # Handle exceptions in batch results
             for result in batch_results:
                 if isinstance(result, Exception):
-                    # Create error result
                     error_result = ChemicalIdentityResult(
                         inci_name="unknown",
                         found=False,
@@ -94,7 +94,6 @@ class ChemicalIdentityMapper:
                 else:
                     results.append(result)
             
-            # Small delay between batches
             await asyncio.sleep(1.0)
         
         return results
