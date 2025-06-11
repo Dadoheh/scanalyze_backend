@@ -9,12 +9,15 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from ..core.auth import get_current_user
 from ..core.database import users_collection
 from ..service.ingredients_cleaner import IngredientsCleaner
+from ..service.chemical_identity_mapper import ChemicalIdentityMapper
+
 
 router = APIRouter(prefix="/product", tags=["product"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ingredientsCleaner = IngredientsCleaner()
+chemical_mapper = ChemicalIdentityMapper()
 
 @router.post("/extract-text")
 async def analyze_product_image(
@@ -51,7 +54,7 @@ async def analyze_product_image(
         
         
         extracted_text = pytesseract.image_to_string(img, lang='eng+pol')
-        print(f"Rozpoznany tekst: {extracted_text}")
+        print(f" text: {extracted_text}")
         
         ingredients = ingredientsCleaner.extract_ingredients_from_text(extracted_text)
         
@@ -103,3 +106,38 @@ async def analyze_ingredients(
         "compatibility_score": compatibility_score,
         "recommendation": recommendation
     }
+    
+@router.post("/map-chemical-identities")
+async def map_chemical_identities(
+    ingredients_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Map INCI ingredients to chemical identifiers (CAS numbers, etc.).
+    
+    Args:
+        ingredients_data: {"ingredients": ["aqua", "glycerin", ...]}
+    """
+    ingredients = ingredients_data.get("ingredients", [])
+    if not ingredients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Brak składników do mapowania."
+        )
+    
+    mapping_results = await chemical_mapper.map_ingredients_batch(ingredients)
+    
+    successful_mappings = [r for r in mapping_results if r.found]
+    failed_mappings = [r for r in mapping_results if not r.found]
+    
+    return {
+        "total_ingredients": len(ingredients),
+        "successful_mappings": len(successful_mappings),
+        "failed_mappings": len(failed_mappings),
+        "results": [r.dict() for r in mapping_results],
+        "summary": {
+            "success_rate": len(successful_mappings) / len(ingredients) * 100,
+            "avg_processing_time_ms": sum(r.processing_time_ms for r in mapping_results) / len(mapping_results)
+        }
+    }
+    
