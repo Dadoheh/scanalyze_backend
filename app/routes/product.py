@@ -74,7 +74,7 @@ async def analyze_product_image(
             detail=f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}"
         )
         
-@router.post("/analyze-ingredients")
+@router.post("/analyze-ingredients")  ## Not used right now
 async def analyze_ingredients(
     ingredients_data: dict,
     current_user: dict = Depends(get_current_user)
@@ -113,7 +113,7 @@ async def map_chemical_identities(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Map INCI ingredients to chemical identifiers (CAS numbers, etc.).
+    Map INCI ingredients to comprehensive chemical data from all sources.
     
     Args:
         ingredients_data: {"ingredients": ["aqua", "glycerin", ...]}
@@ -130,14 +130,42 @@ async def map_chemical_identities(
     successful_mappings = [r for r in mapping_results if r.found]
     failed_mappings = [r for r in mapping_results if not r.found]
     
-    return {
+    total_domains_available = 0
+    domains_with_data = 0
+    
+    for result in successful_mappings:
+        if result.comprehensive_data:
+            total_domains_available += 4  # 4 possible domains
+            if result.comprehensive_data.basic_identifiers:
+                domains_with_data += 1
+            if result.comprehensive_data.toxicology:
+                domains_with_data += 1
+            if result.comprehensive_data.regulatory:
+                domains_with_data += 1
+            if result.comprehensive_data.physical_chemical:
+                domains_with_data += 1
+    
+    data_coverage = (domains_with_data / total_domains_available * 100) if total_domains_available > 0 else 0
+    
+    info = {
         "total_ingredients": len(ingredients),
         "successful_mappings": len(successful_mappings),
         "failed_mappings": len(failed_mappings),
         "results": [r.dict() for r in mapping_results],
-        "summary": {
+        "comprehensive_summary": {
             "success_rate": len(successful_mappings) / len(ingredients) * 100,
-            "avg_processing_time_ms": sum(r.processing_time_ms for r in mapping_results) / len(mapping_results)
+            "data_coverage_percentage": data_coverage,
+            "avg_processing_time_ms": sum(r.processing_time_ms for r in mapping_results) / len(mapping_results),
+            "sources_used": list(set(source for r in mapping_results 
+                                   if r.comprehensive_data 
+                                   for source in r.comprehensive_data.sources_used)),
+            "domains_summary": {
+                "basic_identifiers": sum(1 for r in mapping_results if r.comprehensive_data and r.comprehensive_data.basic_identifiers),
+                "toxicology": sum(1 for r in mapping_results if r.comprehensive_data and r.comprehensive_data.toxicology),
+                "regulatory": sum(1 for r in mapping_results if r.comprehensive_data and r.comprehensive_data.regulatory),
+                "physical_chemical": sum(1 for r in mapping_results if r.comprehensive_data and r.comprehensive_data.physical_chemical)
+            }
         }
     }
-    
+    print(f"Mapping results: {info}")
+    return info

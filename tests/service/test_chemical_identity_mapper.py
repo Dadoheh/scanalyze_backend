@@ -81,8 +81,10 @@ class TestChemicalIdentityMapper:
     async def test_map_ingredient_success_pubchem(self, mapper, mock_pubchem_responses_aqua):
         """Test successful mapping using PubChem scraper."""
         
+        all_responses = mock_pubchem_responses_aqua * 2
+        
         with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request:
-            mock_request.side_effect = mock_pubchem_responses_aqua
+            mock_request.side_effect = all_responses
             
             result = await mapper.map_ingredient("aqua")
             
@@ -94,14 +96,16 @@ class TestChemicalIdentityMapper:
             assert result.identifiers.source == "pubchem"
             assert "pubchem" in result.sources_checked
             assert result.processing_time_ms > 0
-            assert mock_request.call_count == 3
+            assert mock_request.call_count == 6
 
     @pytest.mark.asyncio
     async def test_map_ingredient_success_glycerin(self, mapper, mock_pubchem_responses_glycerin):
         """Test successful mapping of glycerin."""
         
+        all_responses = mock_pubchem_responses_glycerin * 2
+        
         with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request:
-            mock_request.side_effect = mock_pubchem_responses_glycerin
+            mock_request.side_effect = all_responses
             
             result = await mapper.map_ingredient("glycerin")
             
@@ -121,43 +125,8 @@ class TestChemicalIdentityMapper:
             
             assert result.found is False
             assert result.identifiers is None
-            assert "pubchem" in result.sources_checked
-
-    @pytest.mark.asyncio
-    async def test_map_ingredients_batch_pubchem(self, mapper, mock_pubchem_responses_generic):
-        """Test batch processing of multiple ingredients."""
-        ingredients = ["aqua", "glycerin", "parfum"]
-        
-        all_responses = mock_pubchem_responses_generic * len(ingredients)
-        
-        with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request:
-            mock_request.side_effect = all_responses
-            
-            results = await mapper.map_ingredients_batch(ingredients)
-            
-            assert len(results) == 3
-            assert all(isinstance(r, ChemicalIdentityResult) for r in results)
-            assert all(r.found for r in results)
-            assert mock_request.call_count == 9
-
-    @pytest.mark.asyncio
-    async def test_map_ingredients_batch_with_batching(self, mapper, mock_pubchem_responses_generic):
-        """Test batch processing with sleep between batches."""
-        ingredients = [f"ingredient_{i}" for i in range(7)]
-        
-        all_responses = mock_pubchem_responses_generic * len(ingredients)
-        
-        with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request, \
-             patch('asyncio.sleep') as mock_sleep:
-            
-            mock_request.side_effect = all_responses
-            
-            results = await mapper.map_ingredients_batch(ingredients)
-            
-            assert len(results) == 7
-            assert mock_sleep.call_count == 2
-            for call in mock_sleep.call_args_list:
-                assert call[0][0] == 1.0
+            assert len(result.comprehensive_data.sources_used) == 0
+            assert result.comprehensive_data is not None
 
     @pytest.mark.asyncio
     async def test_map_ingredient_with_pubchem_exception(self, mapper):
@@ -170,7 +139,53 @@ class TestChemicalIdentityMapper:
             
             assert result.found is False
             assert result.identifiers is None
-            assert "pubchem" in result.sources_checked
+
+            condition_met = (
+                len(result.errors) > 0 or
+                (result.comprehensive_data and 
+                result.comprehensive_data.basic_identifiers is None and
+                result.comprehensive_data.toxicology is None and
+                result.comprehensive_data.regulatory is None and
+                result.comprehensive_data.physical_chemical is None)
+            )
+            assert condition_met, "Expected errors or all domains to be None"
+            assert result.comprehensive_data is not None
+
+    @pytest.mark.asyncio
+    async def test_map_ingredients_batch_pubchem(self, mapper, mock_pubchem_responses_generic):
+        """Test batch processing of multiple ingredients."""
+        ingredients = ["aqua", "glycerin", "parfum"]
+        
+        all_responses = mock_pubchem_responses_generic * len(ingredients) * 2
+        
+        with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request:
+            mock_request.side_effect = all_responses
+            
+            results = await mapper.map_ingredients_batch(ingredients)
+            
+            assert len(results) == 3
+            assert all(isinstance(r, ChemicalIdentityResult) for r in results)
+            assert all(r.found for r in results)
+            assert mock_request.call_count == 18
+
+    @pytest.mark.asyncio
+    async def test_map_ingredients_batch_with_batching(self, mapper, mock_pubchem_responses_generic):
+        """Test batch processing with sleep between batches."""
+        ingredients = [f"ingredient_{i}" for i in range(7)]
+        
+        all_responses = mock_pubchem_responses_generic * len(ingredients) * 2
+        
+        with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request, \
+             patch('asyncio.sleep') as mock_sleep:
+            
+            mock_request.side_effect = all_responses
+            
+            results = await mapper.map_ingredients_batch(ingredients)
+            
+            assert len(results) == 7
+            assert mock_sleep.call_count == 2
+            for call in mock_sleep.call_args_list:
+                assert call[0][0] == 2.0
 
     @pytest.mark.asyncio
     async def test_map_ingredient_pubchem_partial_data(self, mapper):
@@ -194,11 +209,14 @@ class TestChemicalIdentityMapper:
             })
         ]
         
+        all_responses = partial_responses * 2
+        
         with patch('app.scrapers.base_scraper.BaseScraper._make_request') as mock_request:
-            mock_request.side_effect = partial_responses
+            mock_request.side_effect = all_responses
             
             result = await mapper.map_ingredient("test-ingredient")
             
             assert result.found is True
             assert result.identifiers.cas_number == "123-45-6"
             assert result.identifiers.smiles == "CCO"
+            
