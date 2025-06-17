@@ -49,8 +49,11 @@ class ChemicalIdentityMapper:
         start_time = time.time()
         
         basic_task = self._collect_basic_identifiers(inci_name)
+        await asyncio.sleep(0.1)
         toxicology_task = self._collect_toxicology_data(inci_name)
+        await asyncio.sleep(0.1)
         regulatory_task = self._collect_regulatory_data(inci_name)
+        await asyncio.sleep(0.1) # check if we can remove this to avoid err 503
         physical_task = self._collect_physical_data(inci_name)
         
         try:
