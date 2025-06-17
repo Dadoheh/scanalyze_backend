@@ -33,7 +33,7 @@ class ChemicalIdentityMapper:
         ]
         
         self.physical_scrapers = [
-            ("pubchem", PubChemScraper)
+            # TODO 
         ]
     
     async def map_ingredient(self, inci_name: str) -> ChemicalIdentityResult:

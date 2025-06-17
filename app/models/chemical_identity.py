@@ -22,7 +22,7 @@ class BasicChemicalIdentifiers(BaseModel):
 class ToxicologyData(BaseModel):
     """Toxicological and safety data."""
     allergen_status: Optional[str] = None
-    photoxicity_rist: Optional[str] = None
+    phototoxicity_risk: Optional[str] = None
     irritation_potential: Optional[str] = None
     sensitization_risk: Optional[str] = None
     noael_value: Optional[float] = None
