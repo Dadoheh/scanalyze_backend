@@ -7,7 +7,7 @@ from ..models.chemical_identity import (
     PhysicalChemicalData, ComprehensiveChemicalData, ChemicalIdentityResult
 )
 from ..scrapers.pubchem_scraper import PubChemScraper
-# from ..scrapers.comptox_scraper import CompToxScraper
+from ..scrapers.comptox_scraper import CompToxScraper
 # from ..scrapers.echa_scraper import ECHAScraper
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class ChemicalIdentityMapper:
         ]
         
         self.toxicology_scrapers = [ # TODO
-            # ("comptox", CompToxScraper)  # Will be added
+            # ("comptox", CompToxScraper)
         ]
         
         self.regulatory_scrapers = [ # TODO
