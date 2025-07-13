@@ -6,8 +6,10 @@ from ..models.chemical_identity import (
     BasicChemicalIdentifiers, ToxicologyData, RegulatoryData, 
     PhysicalChemicalData, ComprehensiveChemicalData, ChemicalIdentityResult
 )
+from ..scrapers.pubchem_scraper_v2 import PubChemScraperV2
 from ..scrapers.pubchem_scraper import PubChemScraper
-from ..scrapers.comptox_scraper import CompToxScraper
+
+# from ..scrapers.comptox_scraper import CompToxScraper
 # from ..scrapers.echa_scraper import ECHAScraper
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,9 @@ class ChemicalIdentityMapper:
     def __init__(self):
         # Domain-specific scraper configurations
         self.basic_scrapers = [
-            ("pubchem", PubChemScraper)
+            # ("pubchem", PubChemScraper) # replaced by PubChemScraperV2
+            ("pubchem", PubChemScraperV2)
+
         ]
         
         self.toxicology_scrapers = [ # TODO
