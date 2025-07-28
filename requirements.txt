@@ -36,3 +36,6 @@ numpy==1.24.2
 beautifulsoup4==4.12.2
 lxml==4.9.3
 pubchempy
+aiomysql==0.1.1
+sqlalchemy==2.0.23
+sqlalchemy-utils==0.41.1
