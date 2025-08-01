@@ -20,12 +20,13 @@ Scanalyze Backend provides REST API services for the Scanalyze Flutter applicati
 
 ## Technologies
 
-- **FastAPI**: High-performance Python web framework  
-- **MongoDB**: NoSQL database for data storage  
-- **PyJWT**: JSON Web Token implementation for authentication  
-- **Motor**: Asynchronous MongoDB driver  
-- **Pydantic**: Data validation and settings management  
-- **Docker/Docker Compose**: Containerization for easy deployment
+- **FastAPI** 
+- **MongoDB**
+- **MySQL**
+- **PyJWT** 
+- **Motor**
+- **Pydantic**
+- **Docker/Docker Compose**
 
 ---
 
