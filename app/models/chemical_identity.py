@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -29,6 +29,10 @@ class ToxicologyData(BaseModel):
     safe_concentration: Optional[float] = None
     dermal_absorption: Optional[float] = None
     
+    carcinogenicity: Optional[str] = None
+    dermal_toxicity_values: Optional[List[Dict[str, Any]]] = None
+    toxicological_effects: Optional[List[str]] = None
+
     source: str
     confidence_score: float = 0.0  
     

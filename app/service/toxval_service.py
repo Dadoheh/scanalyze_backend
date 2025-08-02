@@ -2,40 +2,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.sql import text
 from typing import Optional, List, Dict, Any
+import logging
 from ..models.toxval_models import Chemical, Toxval, MvSkinEye, MvCancerSummary, Species
+
+logger = logging.getLogger(__name__)
 
 class ToxValService:
     """Service for retrieving data from the ToxVal database."""
     
     async def find_chemical_by_cas(self, db: AsyncSession, cas_number: str) -> Optional[Dict]:
-        """Search for a chemical by CAS number."""
+        """Wyszukiwanie składnika po numerze CAS."""
+        logger.info(f"Searching ToxVal for CAS: {cas_number}")
         query = select(Chemical).where(Chemical.casrn == cas_number)
         result = await db.execute(query)
         chemical = result.scalars().first()
         
         if chemical:
+            logger.info(f"Found chemical in ToxVal: {chemical.dtxsid} - {chemical.name}")
             return {
                 "dtxsid": chemical.dtxsid,
                 "casrn": chemical.casrn,
                 "name": chemical.name
             }
+        logger.warning(f"No chemical found in ToxVal for CAS: {cas_number}")
         return None
     
-    async def find_chemical_by_name(self, db: AsyncSession, name: str) -> Optional[Dict]:
-        """Search for a chemical by name (or part of it)."""
-        query = select(Chemical).where(Chemical.name.like(f"%{name}%"))
-        result = await db.execute(query)
-        chemicals = result.scalars().all()
-        
-        return [{"dtxsid": c.dtxsid, "casrn": c.casrn, "name": c.name} for c in chemicals]
-    
     async def get_skin_eye_data(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Retrieve data on skin and eye effects for a chemical."""
+        """Pobierz dane o działaniu na skórę i oczy dla składnika."""
+        logger.info(f"Fetching skin/eye data for DTXSID: {dtxsid}")
         query = select(MvSkinEye).where(MvSkinEye.dtxsid == dtxsid)
         result = await db.execute(query)
         data = result.scalars().all()
         
-        return [
+        skin_eye_data = [
             {
                 "endpoint": item.endpoint,
                 "classification": item.classification,
@@ -46,14 +45,19 @@ class ToxValService:
             } 
             for item in data
         ]
+        
+        logger.info(f"Found {len(skin_eye_data)} skin/eye records for {dtxsid}")
+        logger.debug(f"Skin/eye data: {skin_eye_data[:5]}{'...' if len(skin_eye_data) > 5 else ''}")
+        return skin_eye_data
     
     async def get_cancer_data(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Retrieve data on the carcinogenic potential of a chemical."""
+        """Pobierz dane o potencjale rakotwórczym składnika."""
+        logger.info(f"Fetching cancer data for DTXSID: {dtxsid}")
         query = select(MvCancerSummary).where(MvCancerSummary.dtxsid == dtxsid)
         result = await db.execute(query)
         data = result.scalars().all()
         
-        return [
+        cancer_data = [
             {
                 "source": item.source,
                 "exposure_route": item.exposure_route,
@@ -62,9 +66,14 @@ class ToxValService:
             } 
             for item in data
         ]
+        
+        logger.info(f"Found {len(cancer_data)} cancer records for {dtxsid}")
+        logger.debug(f"Cancer data: {cancer_data}")
+        return cancer_data
     
     async def get_dermal_toxicity(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Retrieve data on dermal toxicity."""
+        """Pobierz dane o toksyczności skórnej."""
+        logger.info(f"Fetching dermal toxicity for DTXSID: {dtxsid}")
         query = select(Toxval).where(
             Toxval.dtxsid == dtxsid,
             or_(Toxval.exposure_route.like('%Dermal%'), 
@@ -75,7 +84,7 @@ class ToxValService:
         result = await db.execute(query)
         data = result.scalars().all()
         
-        return [
+        toxicity_data = [
             {
                 "toxval_type": item.toxval_type,
                 "toxval_numeric": item.toxval_numeric,
@@ -87,33 +96,35 @@ class ToxValService:
             }
             for item in data
         ]
+        
+        logger.info(f"Found {len(toxicity_data)} dermal toxicity records for {dtxsid}")
+        logger.debug(f"Sample toxicity data: {toxicity_data[:3]}{'...' if len(toxicity_data) > 3 else ''}")
+        return toxicity_data
     
     async def get_complete_toxval_data(self, db: AsyncSession, cas_number: str) -> Dict[str, Any]:
-        """Retrieve all toxicological data for a chemical by CAS number."""
+        """Pobierz wszystkie dane toksykologiczne dla składnika po CAS."""
+        logger.info(f"Getting complete ToxVal data for CAS: {cas_number}")
         chemical = await self.find_chemical_by_cas(db, cas_number)
         if not chemical:
-            return {"error": "Chemical not found in the ToxVal database"}
+            logger.warning(f"No chemical found in ToxVal database for CAS: {cas_number}")
+            return {"error": "Składnik nie znaleziony w bazie ToxVal"}
         
         dtxsid = chemical["dtxsid"]
         
-        return {
+        skin_eye_data = await self.get_skin_eye_data(db, dtxsid)
+        cancer_data = await self.get_cancer_data(db, dtxsid)
+        dermal_toxicity = await self.get_dermal_toxicity(db, dtxsid)
+        
+        result = {
             "chemical_info": chemical,
-            "skin_eye_data": await self.get_skin_eye_data(db, dtxsid),
-            "cancer_data": await self.get_cancer_data(db, dtxsid),
-            "dermal_toxicity": await self.get_dermal_toxicity(db, dtxsid)
+            "skin_eye_data": skin_eye_data,
+            "cancer_data": cancer_data,
+            "dermal_toxicity": dermal_toxicity
         }
-
-    async def search_ingredients(self, db: AsyncSession, search_term: str) -> List[Dict]:
-        """Search for chemicals by name or CAS number."""
-        # Check if search_term looks like a CAS number (contains hyphens)
-        if "-" in search_term:
-            # Search exactly by CAS
-            query = select(Chemical).where(Chemical.casrn == search_term)
-        else:
-            # Search by name using LIKE
-            query = select(Chemical).where(Chemical.name.like(f"%{search_term}%"))
         
-        result = await db.execute(query)
-        chemicals = result.scalars().all()
+        logger.info(f"Complete ToxVal data summary for {chemical['name']} ({cas_number}):")
+        logger.info(f"  - Skin/eye records: {len(skin_eye_data)}")
+        logger.info(f"  - Cancer records: {len(cancer_data)}")
+        logger.info(f"  - Dermal toxicity records: {len(dermal_toxicity)}")
         
-        return [{"dtxsid": c.dtxsid, "casrn": c.casrn, "name": c.name} for c in chemicals]
+        return result

@@ -1,8 +1,11 @@
 from typing import Dict, Any, Optional
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.mysql_database import async_session
 from ..service.toxval_service import ToxValService
 from .base_scraper import BaseScraper
+
+logger = logging.getLogger(__name__)
 
 class ToxValScraper(BaseScraper):
     """Scraper for the local MySQL ToxVal database."""
@@ -14,92 +17,150 @@ class ToxValScraper(BaseScraper):
     
     async def __aenter__(self):
         """Enter the asynchronous context and initialize the database session."""
+        logger.debug("Initializing ToxValScraper database session")
         self.db = async_session()
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit the asynchronous context and close the database session."""
-        await self.db.close()
+        logger.debug("Closing ToxValScraper database session")
+        if self.db:
+            await self.db.close()
     
     async def search_by_name(self, name: str) -> Dict[str, Any]:
-        """Search for a chemical by its INCI name.
-        
-        Args:
-            name (str): The INCI name of the chemical.
-        
-        Returns:
-            Dict[str, Any]: A dictionary containing the search results.
-        """
-        chemicals = await self.service.find_chemical_by_name(self.db, name)
-        
-        if not chemicals or len(chemicals) == 0:
-            return {"found": False}
+        """Search by INCI name."""
+        logger.info(f"ToxValScraper: searching by name: {name}")
+        try:
+            chemicals = await self.service.find_chemical_by_name(self.db, name)
             
-        # Take the first result as the best match
-        chemical = chemicals[0]
-        dtxsid = chemical["dtxsid"]
-        
-        # Gather all data
-        skin_eye = await self.service.get_skin_eye_data(self.db, dtxsid)
-        cancer = await self.service.get_cancer_data(self.db, dtxsid)
-        dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
-        
-        # Map to the format expected by ChemicalIdentityMapper
-        return {
-            "found": True,
-            "irritation_potential": self._extract_irritation(skin_eye),
-            "sensitization_potential": self._extract_sensitization(skin_eye),
-            "carcinogenicity": self._extract_carcinogenicity(cancer),
-            "source": "toxval"
-        }
+            if not chemicals or len(chemicals) == 0:
+                logger.info(f"ToxValScraper: No match found for name: {name}")
+                return {"found": False}
+                
+            chemical = chemicals[0]
+            dtxsid = chemical["dtxsid"]
+            
+            logger.info(f"ToxValScraper: Found match for {name}: {chemical['name']} ({chemical['casrn']}, {dtxsid})")
+            
+            skin_eye = await self.service.get_skin_eye_data(self.db, dtxsid)
+            cancer = await self.service.get_cancer_data(self.db, dtxsid)
+            dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
+            
+            logger.info(f"ToxValScraper data collected for {name}:")
+            logger.info(f"  - Skin/eye data: {len(skin_eye)} records")
+            logger.info(f"  - Cancer data: {len(cancer)} records")
+            logger.info(f"  - Dermal toxicity: {len(dermal)} records")
+            
+            result = {
+                "found": True,
+                "irritation_potential": self._extract_irritation(skin_eye),
+                "sensitization_risk": self._extract_sensitization(skin_eye),  
+                "carcinogenicity": self._extract_carcinogenicity(cancer),
+                "noael_value": self._extract_noael(dermal),  
+                "dermal_toxicity_values": self._extract_toxicity_values(dermal), 
+                "source": "toxval"
+            }
+            
+            logger.debug(f"ToxValScraper results for {name}: {result}")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Toxicology data failed for toxval: {e}")
+            return {"found": False}
     
     async def search_by_cas(self, cas_number: str) -> Dict[str, Any]:
-        """Search for a chemical by its CAS number.
-        
-        Args:
-            cas_number (str): The CAS number of the chemical.
-        
-        Returns:
-            Dict[str, Any]: A dictionary containing the search results.
-        """
-        chemical = await self.service.find_chemical_by_cas(self.db, cas_number)
-        
-        if not chemical:
+        """Search by CAS number."""
+        logger.info(f"ToxValScraper: searching by CAS: {cas_number}")
+        try:
+            chemical = await self.service.find_chemical_by_cas(self.db, cas_number)
+            
+            if not chemical:
+                logger.info(f"ToxValScraper: No match found for CAS: {cas_number}")
+                return {"found": False}
+                
+            dtxsid = chemical["dtxsid"]
+            
+            logger.info(f"ToxValScraper: Found match for CAS {cas_number}: {chemical['name']} ({dtxsid})")
+            
+            skin_eye = await self.service.get_skin_eye_data(self.db, dtxsid)
+            cancer = await self.service.get_cancer_data(self.db, dtxsid)
+            dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
+            
+            logger.info(f"ToxValScraper data collected for CAS {cas_number}:")
+            logger.info(f"  - Skin/eye data: {len(skin_eye)} records")
+            logger.info(f"  - Cancer data: {len(cancer)} records")
+            logger.info(f"  - Dermal toxicity: {len(dermal)} records")
+            
+            result = {
+                "found": True,
+                "irritation_potential": self._extract_irritation(skin_eye),
+                "sensitization_risk": self._extract_sensitization(skin_eye),
+                "carcinogenicity": self._extract_carcinogenicity(cancer),
+                "noael_value": self._extract_noael(dermal),
+                "dermal_toxicity_values": self._extract_toxicity_values(dermal),
+                "toxicological_effects": self._extract_effects(dermal),
+                "source": "toxval",
+                "confidence_score": 0.8  # ToxVal to wiarygodne źródło danych
+            }
+            
+            logger.debug(f"ToxValScraper results for CAS {cas_number}: {result}")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Toxicology data failed for toxval: {e}")
             return {"found": False}
             
-        dtxsid = chemical["dtxsid"]
-        
-        # Gather all data
-        skin_eye = await self.service.get_skin_eye_data(self.db, dtxsid)
-        cancer = await self.service.get_cancer_data(self.db, dtxsid)
-        dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
-        
-        # Map to the format expected by ChemicalIdentityMapper
-        return {
-            "found": True,
-            "irritation_potential": self._extract_irritation(skin_eye),
-            "sensitization_potential": self._extract_sensitization(skin_eye),
-            "carcinogenicity": self._extract_carcinogenicity(cancer),
-            "source": "toxval"
-        }
-        
     def _extract_irritation(self, skin_eye_data):
         """Extract irritation potential from skin and eye data."""
         for item in skin_eye_data:
             if "irritation" in item.get("endpoint", "").lower():
+                logger.debug(f"Found irritation data: {item.get('result_text')}")
                 return item.get("result_text")
+        logger.debug("No irritation data found")
         return None
         
     def _extract_sensitization(self, skin_eye_data):
         """Extract sensitization potential from skin and eye data."""
         for item in skin_eye_data:
             if "sensitisation" in item.get("endpoint", "").lower():
+                logger.debug(f"Found sensitization data: {item.get('result_text')}")
                 return item.get("result_text")
+        logger.debug("No sensitization data found")
         return None
         
     def _extract_carcinogenicity(self, cancer_data):
         """Extract carcinogenicity information from cancer data."""
         if cancer_data:
+            logger.debug(f"Found carcinogenicity data: {cancer_data[0].get('cancer_call')}")
             return cancer_data[0].get("cancer_call")
+        logger.debug("No carcinogenicity data found")
         return None
     
+    def _extract_noael(self, toxicity_data):
+        """Extract NOAEL value from toxicity data."""
+        for item in toxicity_data:
+            if "NOAEL" in item.get("toxval_type", ""):
+                return item.get("toxval_numeric")
+        return None
+
+    def _extract_toxicity_values(self, toxicity_data):
+        """Extract structured toxicity values."""
+        result = []
+        for item in toxicity_data:
+            if item.get("toxval_numeric") and item.get("toxval_type"):
+                result.append({
+                    "type": item.get("toxval_type"),
+                    "value": item.get("toxval_numeric"),
+                    "unit": item.get("toxval_units"),
+                    "effect": item.get("toxicological_effect")
+                })
+        return result if result else None
+    
+    def _extract_effects(self, toxicity_data):
+        """Extract unique toxicological effects."""
+        effects = set()
+        for item in toxicity_data:
+            effect = item.get("toxicological_effect")
+            if effect:
+                effects.add(effect)
+        return list(effects) if effects else None
