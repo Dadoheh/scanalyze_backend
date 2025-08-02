@@ -7,12 +7,17 @@ services:
       - "9091:8000"
     depends_on:
       - mongo
+      - mysql
     volumes:
       - .:/app
     env_file:
       - .env
     environment:
       - MONGO_URI=mongodb://mongo:27055
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DB=res_toxval_v96_2
     networks:
       - app-network
 
@@ -27,8 +32,22 @@ services:
     networks:
       - app-network
 
+  mysql:
+    image: mysql:8
+    container_name: toxval_mysql
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=admin
+      - MYSQL_DATABASE=res_toxval_v96_2
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+
 volumes:
   mongo_data:
+  mysql_data:
 
 networks:
   app-network:

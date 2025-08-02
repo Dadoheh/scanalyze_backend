@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class BaseScraper(abc.ABC):
     """Base abstract class for all scrapers."""
     
-    def __init__(self, rate_limit: float = 1.0):
+    def __init__(self, rate_limit: float = 0.1):
         """
         Initialize the scraper with an optional rate limit.
         

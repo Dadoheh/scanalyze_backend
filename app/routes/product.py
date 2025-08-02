@@ -125,6 +125,7 @@ async def map_chemical_identities(
             detail="Brak składników do mapowania."
         )
     
+    print(f"Start mapping results")
     mapping_results = await chemical_mapper.map_ingredients_batch(ingredients)
     
     successful_mappings = [r for r in mapping_results if r.found]
