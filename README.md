@@ -20,14 +20,33 @@ Scanalyze Backend provides REST API services for the Scanalyze Flutter applicati
 
 ## Technologies
 
-- **FastAPI**: High-performance Python web framework  
-- **MongoDB**: NoSQL database for data storage  
-- **PyJWT**: JSON Web Token implementation for authentication  
-- **Motor**: Asynchronous MongoDB driver  
-- **Pydantic**: Data validation and settings management  
-- **Docker/Docker Compose**: Containerization for easy deployment
+- **FastAPI** 
+- **MongoDB**
+- **MySQL**
+- **PyJWT** 
+- **Motor**
+- **Pydantic**
+- **Docker/Docker Compose**
+- **ToxValDB**: EPA's toxicology database for ingredient analysis
 
 ---
+
+## Data Resources
+
+### ToxValDB Database
+
+The application uses the EPA's ToxValDB database for ingredient analysis and toxicology data:
+
+- **Source**: [EPA ToxValDB](https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=344315&Lab=NCCT)
+- **Local Setup**: For development, you'll need to download the ToxValDB database locally
+- **Docker Integration**: The application uses a dump of this database in the Docker container
+
+#### Downloading ToxValDB
+
+1. Visit the [EPA ToxValDB page](https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=344315&Lab=NCCT)
+2. Download the database files following the EPA's instructions
+3. Place the downloaded database files in the `data/toxvaldb` directory
+
 
 ## Getting Started
 
@@ -35,6 +54,7 @@ Scanalyze Backend provides REST API services for the Scanalyze Flutter applicati
 
 - Docker and Docker Compose  
 - Python 3.11+ (for local development)
+- ToxValDB database files (see [Data Resources](#data-resources) section)
 
 ### Installation
 
