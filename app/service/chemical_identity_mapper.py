@@ -178,6 +178,9 @@ class ChemicalIdentityMapper:
                             noael_value=data.get("noael_value"),
                             safe_concentration=data.get("safe_concentration"),
                             dermal_absorption=data.get("dermal_absorption"),
+                            carcinogenicity=data.get("carcinogenicity"),
+                            dermal_toxicity_values=data.get("dermal_toxicity_values"),
+                            toxicological_effects=data.get("toxicological_effects"),
                             source=source_name,
                             confidence_score=data.get("confidence_score", 0.5)
                         )

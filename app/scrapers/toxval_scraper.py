@@ -27,7 +27,7 @@ class ToxValScraper(BaseScraper):
         if self.db:
             await self.db.close()
     
-    async def search_by_name(self, name: str) -> Dict[str, Any]:
+    async def search_by_name(self, name: str) -> Dict[str, Any]: #DRY
         """Search by INCI name."""
         logger.info(f"ToxValScraper: searching by name: {name}")
         try:
@@ -46,29 +46,30 @@ class ToxValScraper(BaseScraper):
             cancer = await self.service.get_cancer_data(self.db, dtxsid)
             dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
             
-            logger.info(f"ToxValScraper data collected for {name}:")
-            logger.info(f"  - Skin/eye data: {len(skin_eye)} records")
-            logger.info(f"  - Cancer data: {len(cancer)} records")
-            logger.info(f"  - Dermal toxicity: {len(dermal)} records")
+            toxvaldb_data = await self.service.get_toxvaldb_data(self.db, dtxsid=dtxsid)
+            
+            noael_value = self._extract_noael_from_toxvaldb(toxvaldb_data) or self._extract_noael(dermal)
             
             result = {
                 "found": True,
                 "irritation_potential": self._extract_irritation(skin_eye),
-                "sensitization_risk": self._extract_sensitization(skin_eye),  
+                "sensitization_risk": self._extract_sensitization(skin_eye),
                 "carcinogenicity": self._extract_carcinogenicity(cancer),
-                "noael_value": self._extract_noael(dermal),  
-                "dermal_toxicity_values": self._extract_toxicity_values(dermal), 
-                "source": "toxval"
+                "noael_value": noael_value,
+                "dermal_toxicity_values": self._extract_toxicity_values_from_toxvaldb(toxvaldb_data),
+                "toxicological_effects": self._extract_effects_from_toxvaldb(toxvaldb_data),
+                "source": "toxval",
+                "confidence_score": 0.8
             }
             
-            logger.debug(f"ToxValScraper results for {name}: {result}")
+            logger.debug(f"ToxValScraper results for name {name}: {result}")
             return result
             
         except Exception as e:
             logger.warning(f"Toxicology data failed for toxval: {e}")
             return {"found": False}
     
-    async def search_by_cas(self, cas_number: str) -> Dict[str, Any]:
+    async def search_by_cas(self, cas_number: str) -> Dict[str, Any]: # DRY
         """Search by CAS number."""
         logger.info(f"ToxValScraper: searching by CAS: {cas_number}")
         try:
@@ -82,25 +83,25 @@ class ToxValScraper(BaseScraper):
             
             logger.info(f"ToxValScraper: Found match for CAS {cas_number}: {chemical['name']} ({dtxsid})")
             
+            # Collect data from different tables
             skin_eye = await self.service.get_skin_eye_data(self.db, dtxsid)
             cancer = await self.service.get_cancer_data(self.db, dtxsid)
             dermal = await self.service.get_dermal_toxicity(self.db, dtxsid)
             
-            logger.info(f"ToxValScraper data collected for CAS {cas_number}:")
-            logger.info(f"  - Skin/eye data: {len(skin_eye)} records")
-            logger.info(f"  - Cancer data: {len(cancer)} records")
-            logger.info(f"  - Dermal toxicity: {len(dermal)} records")
+            toxvaldb_data = await self.service.get_toxvaldb_data(self.db, dtxsid=dtxsid)
+            
+            noael_value = self._extract_noael_from_toxvaldb(toxvaldb_data) or self._extract_noael(dermal)
             
             result = {
                 "found": True,
                 "irritation_potential": self._extract_irritation(skin_eye),
                 "sensitization_risk": self._extract_sensitization(skin_eye),
                 "carcinogenicity": self._extract_carcinogenicity(cancer),
-                "noael_value": self._extract_noael(dermal),
-                "dermal_toxicity_values": self._extract_toxicity_values(dermal),
-                "toxicological_effects": self._extract_effects(dermal),
+                "noael_value": noael_value,
+                "dermal_toxicity_values": self._extract_toxicity_values_from_toxvaldb(toxvaldb_data),
+                "toxicological_effects": self._extract_effects_from_toxvaldb(toxvaldb_data),
                 "source": "toxval",
-                "confidence_score": 0.8  # ToxVal to wiarygodne źródło danych
+                "confidence_score": 0.8
             }
             
             logger.debug(f"ToxValScraper results for CAS {cas_number}: {result}")
@@ -143,23 +144,34 @@ class ToxValScraper(BaseScraper):
                 return item.get("toxval_numeric")
         return None
 
-    def _extract_toxicity_values(self, toxicity_data):
-        """Extract structured toxicity values."""
+    def _extract_noael_from_toxvaldb(self, toxvaldb_data):
+        """Extract NOAEL value from toxvaldb data."""
+        for item in toxvaldb_data:
+            toxval_type = item.get("toxval_type", "").upper()
+            if "NOAEL" in toxval_type or "NOEL" in toxval_type:
+                return item.get("toxval_numeric")
+        return None
+
+    def _extract_toxicity_values_from_toxvaldb(self, toxvaldb_data):
+        """Extract structured toxicity values from toxvaldb."""
         result = []
-        for item in toxicity_data:
-            if item.get("toxval_numeric") and item.get("toxval_type"):
+        for item in toxvaldb_data:
+            if item.get("toxval_numeric") is not None:
                 result.append({
                     "type": item.get("toxval_type"),
                     "value": item.get("toxval_numeric"),
                     "unit": item.get("toxval_units"),
-                    "effect": item.get("toxicological_effect")
+                    "effect": item.get("toxicological_effect"),
+                    "route": item.get("exposure_route"),
+                    "species": item.get("species_common"),
+                    "risk_class": item.get("risk_assessment_class")
                 })
         return result if result else None
-    
-    def _extract_effects(self, toxicity_data):
-        """Extract unique toxicological effects."""
+
+    def _extract_effects_from_toxvaldb(self, toxvaldb_data):
+        """Extract unique toxicological effects from toxvaldb."""
         effects = set()
-        for item in toxicity_data:
+        for item in toxvaldb_data:
             effect = item.get("toxicological_effect")
             if effect:
                 effects.add(effect)

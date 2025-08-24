@@ -26,6 +26,25 @@ class Toxval(Base):
     species_id = Column(Integer)
     species_original = Column(String(255))
     
+class MvToxValDB(Base):
+    __tablename__ = "mv_toxvaldb"
+    
+    id = Column(Integer, primary_key=True)
+    dtxsid = Column(String(255), index=True)
+    casrn = Column(String(45), index=True)
+    name = Column(String(255))
+    source = Column(String(255))
+    toxval_type = Column(String(255))
+    toxval_numeric = Column(Float)
+    toxval_units = Column(String(255))
+    risk_assessment_class = Column(String(255))
+    human_eco = Column(String(255))
+    study_type = Column(String(255))
+    species_common = Column(String(255))
+    exposure_route = Column(String(255))
+    toxicological_effect = Column(Text)
+    qc_category = Column(Text)
+
 class MvSkinEye(Base):
     __tablename__ = "mv_skin_eye"
     

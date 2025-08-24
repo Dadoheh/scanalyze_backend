@@ -3,7 +3,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.sql import text
 from typing import Optional, List, Dict, Any
 import logging
-from ..models.toxval_models import Chemical, Toxval, MvSkinEye, MvCancerSummary, Species
+from ..models.toxval_models import Chemical, MvToxValDB, Toxval, MvSkinEye, MvCancerSummary, Species
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +98,44 @@ class ToxValService:
         ]
         
         logger.info(f"Found {len(toxicity_data)} dermal toxicity records for {dtxsid}")
-        logger.debug(f"Sample toxicity data: {toxicity_data[:3]}{'...' if len(toxicity_data) > 3 else ''}")
+        logger.debug(f"Sample toxicity data: {toxicity_data} .end.")
         return toxicity_data
     
+    async def get_toxvaldb_data(self, db: AsyncSession, dtxsid: str = None, casrn: str = None) -> List[Dict]:
+        """Data from materialized view ToxValDB."""
+        logger.info(f"Fetching ToxValDB data for DTXSID: {dtxsid} or CAS: {casrn}")
+        
+        if dtxsid:
+            query = select(MvToxValDB).where(MvToxValDB.dtxsid == dtxsid)
+        elif casrn:
+            query = select(MvToxValDB).where(MvToxValDB.casrn == casrn)
+        else:
+            return []
+        
+        result = await db.execute(query)
+        data = result.scalars().all()
+        
+        toxval_data = [
+            {
+                "toxval_type": item.toxval_type,
+                "toxval_numeric": item.toxval_numeric,
+                "toxval_units": item.toxval_units,
+                "risk_assessment_class": item.risk_assessment_class,
+                "human_eco": item.human_eco,
+                "study_type": item.study_type,
+                "species_common": item.species_common,
+                "exposure_route": item.exposure_route,
+                "toxicological_effect": item.toxicological_effect,
+                "source": item.source,
+                "qc_category": item.qc_category
+            }
+            for item in data
+        ]
+        
+        logger.info(f"Found {len(toxval_data)} ToxValDB records")
+        logger.debug(f"Sample ToxValDB data: {toxval_data}")
+        return toxval_data
+
     async def get_complete_toxval_data(self, db: AsyncSession, cas_number: str) -> Dict[str, Any]:
         """Pobierz wszystkie dane toksykologiczne dla składnika po CAS."""
         logger.info(f"Getting complete ToxVal data for CAS: {cas_number}")
@@ -128,3 +163,4 @@ class ToxValService:
         logger.info(f"  - Dermal toxicity records: {len(dermal_toxicity)}")
         
         return result
+    
