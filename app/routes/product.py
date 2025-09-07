@@ -10,6 +10,7 @@ from ..core.auth import get_current_user
 from ..core.database import users_collection
 from ..service.ingredients_cleaner import IngredientsCleaner
 from ..service.chemical_identity_mapper import ChemicalIdentityMapper
+from ..prettier import save_analysis_results
 
 
 router = APIRouter(prefix="/product", tags=["product"])
@@ -168,5 +169,8 @@ async def map_chemical_identities(
             }
         }
     }
+
+    save_analysis_results(info)
+
     print(f"Mapping results: {info}")
     return info

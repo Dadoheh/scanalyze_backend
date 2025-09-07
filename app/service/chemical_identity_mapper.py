@@ -181,6 +181,7 @@ class ChemicalIdentityMapper:
                             carcinogenicity=data.get("carcinogenicity"),
                             dermal_toxicity_values=data.get("dermal_toxicity_values"),
                             toxicological_effects=data.get("toxicological_effects"),
+                            dtxsid=data.get("dtxsid"),
                             source=source_name,
                             confidence_score=data.get("confidence_score", 0.5)
                         )

@@ -52,12 +52,16 @@ class ToxValScraper(BaseScraper):
             
             result = {
                 "found": True,
+                "dtxsid": dtxsid,
                 "irritation_potential": self._extract_irritation(skin_eye),
                 "sensitization_risk": self._extract_sensitization(skin_eye),
+                "allergen_status": self._extract_allergen_status(skin_eye),
                 "carcinogenicity": self._extract_carcinogenicity(cancer),
                 "noael_value": noael_value,
                 "dermal_toxicity_values": self._extract_toxicity_values_from_toxvaldb(toxvaldb_data),
                 "toxicological_effects": self._extract_effects_from_toxvaldb(toxvaldb_data),
+                "safe_concentration": self._extract_safe_concentration(toxvaldb_data),
+                "dermal_absorption": self._extract_dermal_absorption(toxvaldb_data),
                 "source": "toxval",
                 "confidence_score": 0.8
             }
@@ -94,12 +98,16 @@ class ToxValScraper(BaseScraper):
             
             result = {
                 "found": True,
+                "dtxsid": dtxsid,
                 "irritation_potential": self._extract_irritation(skin_eye),
                 "sensitization_risk": self._extract_sensitization(skin_eye),
+                "allergen_status": self._extract_allergen_status(skin_eye),
                 "carcinogenicity": self._extract_carcinogenicity(cancer),
                 "noael_value": noael_value,
                 "dermal_toxicity_values": self._extract_toxicity_values_from_toxvaldb(toxvaldb_data),
                 "toxicological_effects": self._extract_effects_from_toxvaldb(toxvaldb_data),
+                "safe_concentration": self._extract_safe_concentration(toxvaldb_data),
+                "dermal_absorption": self._extract_dermal_absorption(toxvaldb_data),
                 "source": "toxval",
                 "confidence_score": 0.8
             }
@@ -110,7 +118,76 @@ class ToxValScraper(BaseScraper):
         except Exception as e:
             logger.warning(f"Toxicology data failed for toxval: {e}")
             return {"found": False}
+    
+
+
+    def _extract_safe_concentration(self, toxvaldb_data):
+        """Extract safe concentration values."""
+        safety_value_types = ['ADI', 'TDI', 'RfD', 'DNEL', 'PNEC', 'MRL']
+        safe_concentrations = []
+        
+        for item in toxvaldb_data:
+            logger.debug(f"Evaluating toxvaldb item for safe concentration: {item}")
+            toxval_type = item.get("toxval_type", "")
+            matches_safety_type = any(safety_type in toxval_type for safety_type in safety_value_types)
             
+            if matches_safety_type and item.get("human_eco") == "human health":
+                value = item.get("toxval_numeric")
+                unit = item.get("toxval_units", "")
+                
+                if value is not None:
+                    safe_concentrations.append({
+                        "value": value,
+                        "unit": unit,
+                        "type": toxval_type
+                    })
+        if safe_concentrations:
+            primary = safe_concentrations[0]
+            return f"{primary['value']} {primary['unit']} ({primary['type']})"
+        
+        return None
+
+    def _extract_allergen_status(self, skin_eye_data): # todo: improve searching
+        """Extract allergen status information from skin_eye data - simplified version."""
+        for item in skin_eye_data:
+            classification = item.get("classification")
+            if classification and "skin sens" in classification.lower():
+                logger.debug(f"Found skin sensitization classification: {classification}")
+                return classification
+            
+            endpoint = item.get("endpoint", "")
+            if endpoint and "sensitization" in endpoint.lower():
+                result_text = item.get("result_text", "")
+                if result_text:
+                    if "not sensitising" in result_text.lower() or "non-sensitising" in result_text.lower():
+                        return "Not sensitizing"
+                    elif "sensitising" in result_text.lower() or "sensitizing" in result_text.lower():
+                        return "Sensitizing agent"
+        
+        for item in skin_eye_data:
+            result_text = item.get("result_text", "")
+            if result_text:
+                if "allergen" in result_text.lower() or "allergic" in result_text.lower():
+                    return result_text
+        
+        return None
+
+    def _extract_dermal_absorption(self, toxvaldb_data):
+        """Extract dermal absorption percentage with relaxed criteria."""
+        for item in toxvaldb_data:
+            effect = item.get("toxicological_effect", "").lower()
+            route = item.get("exposure_route", "").lower()
+            
+            if (("absorption" in effect or "penetration" in effect or "permeab" in effect) and
+                ("dermal" in route or "cutaneous" in route)):
+                return f"{item.get('toxval_numeric')}% absorption"
+            
+            if (("absorb" in effect or "bioavailab" in effect) and
+                ("dermal" in route or "cutaneous" in route or "skin" in route)):
+                return f"{item.get('toxval_numeric')} {item.get('toxval_units', '')} (absorption estimate)"
+        
+        return None
+    
     def _extract_irritation(self, skin_eye_data):
         """Extract irritation potential from skin and eye data."""
         for item in skin_eye_data:
@@ -137,7 +214,7 @@ class ToxValScraper(BaseScraper):
         logger.debug("No carcinogenicity data found")
         return None
     
-    def _extract_noael(self, toxicity_data):
+    def _extract_noael(self, toxicity_data):  # check it out - we get NOAEL but it returns NONE
         """Extract NOAEL value from toxicity data."""
         for item in toxicity_data:
             if "NOAEL" in item.get("toxval_type", ""):

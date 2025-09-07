@@ -28,7 +28,7 @@ class ToxValService:
         return None
     
     async def get_skin_eye_data(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Pobierz dane o działaniu na skórę i oczy dla składnika."""
+        """Retrieve data on the effects on skin and eyes for the substance."""
         logger.info(f"Fetching skin/eye data for DTXSID: {dtxsid}")
         query = select(MvSkinEye).where(MvSkinEye.dtxsid == dtxsid)
         result = await db.execute(query)
@@ -51,7 +51,7 @@ class ToxValService:
         return skin_eye_data
     
     async def get_cancer_data(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Pobierz dane o potencjale rakotwórczym składnika."""
+        """Retrieve data on the carcinogenic potential of the substance."""
         logger.info(f"Fetching cancer data for DTXSID: {dtxsid}")
         query = select(MvCancerSummary).where(MvCancerSummary.dtxsid == dtxsid)
         result = await db.execute(query)
@@ -72,7 +72,7 @@ class ToxValService:
         return cancer_data
     
     async def get_dermal_toxicity(self, db: AsyncSession, dtxsid: str) -> List[Dict]:
-        """Pobierz dane o toksyczności skórnej."""
+        """Retrieve data on dermal toxicity."""
         logger.info(f"Fetching dermal toxicity for DTXSID: {dtxsid}")
         query = select(Toxval).where(
             Toxval.dtxsid == dtxsid,
@@ -137,7 +137,7 @@ class ToxValService:
         return toxval_data
 
     async def get_complete_toxval_data(self, db: AsyncSession, cas_number: str) -> Dict[str, Any]:
-        """Pobierz wszystkie dane toksykologiczne dla składnika po CAS."""
+        """Retrieve all toxicological data for a substance by CAS number."""
         logger.info(f"Getting complete ToxVal data for CAS: {cas_number}")
         chemical = await self.find_chemical_by_cas(db, cas_number)
         if not chemical:
