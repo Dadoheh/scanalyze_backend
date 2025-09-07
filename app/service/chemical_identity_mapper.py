@@ -8,6 +8,7 @@ from ..models.chemical_identity import (
 )
 from ..scrapers.pubchem_scraper_v2 import PubChemScraperV2
 from ..scrapers.pubchem_scraper import PubChemScraper
+from ..scrapers.toxval_scraper import ToxValScraper
 
 # from ..scrapers.comptox_scraper import CompToxScraper
 # from ..scrapers.echa_scraper import ECHAScraper
@@ -29,7 +30,7 @@ class ChemicalIdentityMapper:
         ]
         
         self.toxicology_scrapers = [ # TODO
-            # ("comptox", CompToxScraper)
+            ("toxval", ToxValScraper)
         ]
         
         self.regulatory_scrapers = [ # TODO
@@ -177,6 +178,10 @@ class ChemicalIdentityMapper:
                             noael_value=data.get("noael_value"),
                             safe_concentration=data.get("safe_concentration"),
                             dermal_absorption=data.get("dermal_absorption"),
+                            carcinogenicity=data.get("carcinogenicity"),
+                            dermal_toxicity_values=data.get("dermal_toxicity_values"),
+                            toxicological_effects=data.get("toxicological_effects"),
+                            dtxsid=data.get("dtxsid"),
                             source=source_name,
                             confidence_score=data.get("confidence_score", 0.5)
                         )

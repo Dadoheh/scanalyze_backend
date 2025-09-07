@@ -1,11 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, user, product
+from app.routes import auth, user, product,  toxval 
 import time
 import logging
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
@@ -40,6 +40,7 @@ app.add_middleware(
 
 app.include_router(auth.router, tags=["auth"])
 app.include_router(user.router, prefix="/user", tags=["user"])
+app.include_router(toxval.router, prefix="/api/v1", tags=["toxval"])
 app.include_router(product.router)
 
 @app.get("/")

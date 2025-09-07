@@ -10,6 +10,7 @@ from ..core.auth import get_current_user
 from ..core.database import users_collection
 from ..service.ingredients_cleaner import IngredientsCleaner
 from ..service.chemical_identity_mapper import ChemicalIdentityMapper
+from ..prettier import save_analysis_results
 
 
 router = APIRouter(prefix="/product", tags=["product"])
@@ -125,6 +126,7 @@ async def map_chemical_identities(
             detail="Brak składników do mapowania."
         )
     
+    print(f"Start mapping results")
     mapping_results = await chemical_mapper.map_ingredients_batch(ingredients)
     
     successful_mappings = [r for r in mapping_results if r.found]
@@ -167,5 +169,8 @@ async def map_chemical_identities(
             }
         }
     }
+
+    save_analysis_results(info)
+
     print(f"Mapping results: {info}")
     return info

@@ -29,6 +29,7 @@ class PubChemScraper(BaseScraper):
             return self._parse_pubchem_data(properties, synonyms_data, name)
             
         except Exception as e:
+            print(e)
             return {
                 "source": "pubchem",
                 "found": False,
