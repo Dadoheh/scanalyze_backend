@@ -27,6 +27,7 @@ Scanalyze Backend provides REST API services for the Scanalyze Flutter applicati
 - **Motor**
 - **Pydantic**
 - **Docker/Docker Compose**
+- **Neo4j**
 - **ToxValDB**: EPA's toxicology database for ingredient analysis
 
 ---
