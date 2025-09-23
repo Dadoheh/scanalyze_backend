@@ -4,6 +4,9 @@ from app.routes import auth, user, product,  toxval
 import time
 import logging
 
+from scanalyze_backend.app.core import neo4j_client
+from scanalyze_backend.app.core.neo4j_client import ensure_constraints
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -12,6 +15,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    try:
+        await ensure_constraints()
+        logger.info("Neo4j constraints ensured")
+    except Exception as e:
+        logger.error(f"Neo4j init failed: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    try:
+        await neo4j_client.close()
+        logger.info("Neo4j driver closed")
+    except Exception as e:
+        logger.warning(f"Neo4j close failed: {e}")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

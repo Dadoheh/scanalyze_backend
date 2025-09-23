@@ -6,6 +6,9 @@ import pytesseract
 import numpy as np
 import cv2
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+
+from scanalyze_backend.app.service.decision_service import decide_product
+from scanalyze_backend.app.service.neo4j_sync_service import upsert_ingredient_from_identity, upsert_product, upsert_user_profile
 from ..core.auth import get_current_user
 from ..core.database import users_collection
 from ..service.ingredients_cleaner import IngredientsCleaner
@@ -129,6 +132,39 @@ async def map_chemical_identities(
     print(f"Start mapping results")
     mapping_results = await chemical_mapper.map_ingredients_batch(ingredients)
     
+    ing_keys = []
+    for r in mapping_results:
+        try:
+            await upsert_ingredient_from_identity(r)
+            cd = r.comprehensive_data
+            key = (cd.basic_identifiers.inchi_key.lower() if cd and cd.basic_identifiers and cd.basic_identifiers.inchi_key
+                   else f"cas:{cd.basic_identifiers.cas_number}" if cd and cd.basic_identifiers and cd.basic_identifiers.cas_number
+                   else f"dtxsid:{cd.toxicology.dtxsid}" if cd and cd.toxicology and cd.toxicology.dtxsid
+                   else f"inci:{r.inci_name.lower()}")
+            ing_keys.append(key)
+        except Exception as e:
+            pass
+
+    product_id = f"tmp-{uuid.uuid4()}"
+    await upsert_product(product_id, ing_keys)
+
+    # Mapuj profil użytkownika -> conditions (przykład MVP)
+    conditions = []
+    if current_user.get("sensitiveSkin"): conditions.append("sensitive_skin")
+    if current_user.get("hasAllergies"): conditions.append("allergies")
+    await upsert_user_profile(current_user["id"], conditions)
+
+    decision = await decide_product(current_user["id"], product_id, preferred_routes=["dermal"])
+
+    # Calculate data coverage - prettier for testing
+    info = _create_info(mapping_results, ingredients)
+    
+    save_analysis_results(info)
+
+    print(f"Mapping results: {info}")
+    return {"mapping": info, "decision": decision}
+
+def _create_info(mapping_results, ingredients):
     successful_mappings = [r for r in mapping_results if r.found]
     failed_mappings = [r for r in mapping_results if not r.found]
     
@@ -169,8 +205,4 @@ async def map_chemical_identities(
             }
         }
     }
-
-    save_analysis_results(info)
-
-    print(f"Mapping results: {info}")
     return info
