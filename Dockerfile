@@ -8,9 +8,13 @@ RUN apt-get update && apt-get install -y \
     libleptonica-dev \
     tesseract-ocr-eng \
     tesseract-ocr-pol \
-    libgl1-mesa-glx \
+    libgl1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+
+ENV PIP_DEFAULT_TIMEOUT=600
+ENV PIP_NO_CACHE_DIR=1
 
 COPY ./requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
