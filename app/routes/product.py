@@ -7,8 +7,8 @@ import numpy as np
 import cv2
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from scanalyze_backend.app.service.decision_service import decide_product
-from scanalyze_backend.app.service.neo4j_sync_service import upsert_ingredient_from_identity, upsert_product, upsert_user_profile
+from app.service.decision_service import decide_product
+from app.service.neo4j_sync_service import upsert_ingredient_from_identity, upsert_product, upsert_user_profile
 from ..core.auth import get_current_user
 from ..core.database import users_collection
 from ..service.ingredients_cleaner import IngredientsCleaner

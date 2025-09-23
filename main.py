@@ -4,8 +4,8 @@ from app.routes import auth, user, product,  toxval
 import time
 import logging
 
-from scanalyze_backend.app.core import neo4j_client
-from scanalyze_backend.app.core.neo4j_client import ensure_constraints
+from app.core import neo4j_client
+from app.core.neo4j_client import ensure_constraints
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -47,7 +47,6 @@ async def log_requests(request: Request, call_next):
     
     return response
 
-app.include_router(auth.router)
 
 app.add_middleware(
     CORSMiddleware,
