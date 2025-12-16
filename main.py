@@ -27,7 +27,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     try:
-        await neo4j_client.close()
+        await neo4j_client.neo4j_client.close()
         logger.info("Neo4j driver closed")
     except Exception as e:
         logger.warning(f"Neo4j close failed: {e}")

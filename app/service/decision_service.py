@@ -1,10 +1,10 @@
 from typing import List, Dict, Any
 from app.core.neo4j_client import neo4j_client
 
-async def decide_product(user_id: str, product_id: str, preferred_routes: List[str] = None) -> List[Dict[str, Any]]:
+async def decide_product(user_email: str, product_id: str, preferred_routes: List[str] = None) -> List[Dict[str, Any]]:
     routes = [r.lower() for r in (preferred_routes or ["dermal"])]
     cypher = """
-    MATCH (u:User {id: $uid})-[:HAS_CONDITION]->(c:Condition)
+    MATCH (u:User {email: $uid})-[:HAS_CONDITION]->(c:Condition)
     WITH collect(c.name) AS conds
     MATCH (p:Product {id: $pid})-[:CONTAINS]->(i:Ingredient)-[:HAS_HAZARD]->(h:Hazard)
     WHERE h.route IN $routes
@@ -24,4 +24,4 @@ async def decide_product(user_id: str, product_id: str, preferred_routes: List[s
            round(100*(profile_boost*0.6 + hazard_w*0.4)) AS risk_score
     ORDER BY risk_score DESC
     """
-    return await neo4j_client.run(cypher, {"uid": user_id, "pid": product_id, "routes": routes})
+    return await neo4j_client.run(cypher, {"uid": user_email, "pid": product_id, "routes": routes})

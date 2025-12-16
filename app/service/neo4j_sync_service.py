@@ -148,11 +148,12 @@ async def upsert_product(product_id: str, ingredient_keys: List[str]):
       MERGE (p)-[:CONTAINS]->(i)
     """, {"pid": product_id, "keys": ingredient_keys})
 
-async def upsert_user_profile(user_id: str, conditions: List[str]):
+async def upsert_user_profile(user_email: str, conditions: List[str]):
     await neo4j_client.run("""
-    MERGE (u:User {id: $uid})
+    MERGE (u:User {email: $email})
+    SET u.id = $email
     WITH u, $conds AS cs
     UNWIND cs AS c
       MERGE (cond:Condition {name: c})
       MERGE (u)-[:HAS_CONDITION]->(cond)
-    """, {"uid": user_id, "conds": conditions})
+    """, {"email": user_email, "conds": conditions})

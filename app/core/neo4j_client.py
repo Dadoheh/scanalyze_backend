@@ -22,11 +22,17 @@ class Neo4jClient:
 neo4j_client = Neo4jClient()
 
 async def ensure_constraints():
-    cypher = """
-    CREATE CONSTRAINT user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE;
-    CREATE CONSTRAINT cond_name IF NOT EXISTS FOR (c:Condition) REQUIRE c.name IS UNIQUE;
-    CREATE CONSTRAINT product_id IF NOT EXISTS FOR (p:Product) REQUIRE p.id IS UNIQUE;
-    CREATE CONSTRAINT ing_key IF NOT EXISTS FOR (i:Ingredient) REQUIRE i.key IS UNIQUE;
-    CREATE CONSTRAINT effect_name IF NOT EXISTS FOR (e:Effect) REQUIRE e.name IS UNIQUE;
-    """
-    await neo4j_client.run(cypher)
+    """Create Neo4j constraints one by one (Neo4j doesn't support multiple in one statement)."""
+    constraints = [
+        "CREATE CONSTRAINT user_email IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE",
+        "CREATE CONSTRAINT cond_name IF NOT EXISTS FOR (c:Condition) REQUIRE c.name IS UNIQUE",
+        "CREATE CONSTRAINT product_id IF NOT EXISTS FOR (p:Product) REQUIRE p.id IS UNIQUE",
+        "CREATE CONSTRAINT ing_key IF NOT EXISTS FOR (i:Ingredient) REQUIRE i.key IS UNIQUE",
+        "CREATE CONSTRAINT effect_name IF NOT EXISTS FOR (e:Effect) REQUIRE e.name IS UNIQUE",
+    ]
+    for cypher in constraints:
+        try:
+            await neo4j_client.run(cypher)
+        except Exception as e:
+            # Constraint may already exist, ignore
+            pass

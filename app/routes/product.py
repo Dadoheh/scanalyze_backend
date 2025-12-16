@@ -152,9 +152,9 @@ async def map_chemical_identities(
     conditions = []
     if current_user.get("sensitiveSkin"): conditions.append("sensitive_skin")
     if current_user.get("hasAllergies"): conditions.append("allergies")
-    await upsert_user_profile(current_user["id"], conditions)
+    await upsert_user_profile(current_user["email"], conditions)
 
-    decision = await decide_product(current_user["id"], product_id, preferred_routes=["dermal"])
+    decision = await decide_product(current_user["email"], product_id, preferred_routes=["dermal"])
 
     # Calculate data coverage - prettier for testing
     info = _create_info(mapping_results, ingredients)
