@@ -39,3 +39,6 @@ pubchempy
 aiomysql==0.1.1
 sqlalchemy==2.0.23
 sqlalchemy-utils==0.41.1
+neo4j>=5.17,<6
+py2neo==2021.2.4
+bcrypt==4.0.1
