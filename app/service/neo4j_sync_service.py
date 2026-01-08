@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 from app.core.neo4j_client import neo4j_client
 from app.models.chemical_identity import ChemicalIdentityResult, ToxicologyData, BasicChemicalIdentifiers
 
@@ -147,6 +148,101 @@ async def upsert_product(product_id: str, ingredient_keys: List[str]):
       MERGE (i:Ingredient {key: k})
       MERGE (p)-[:CONTAINS]->(i)
     """, {"pid": product_id, "keys": ingredient_keys})
+
+
+async def upsert_hed_assessment(inci_name: str, neo4j_hed_data: Dict[str, Any], ingredient_key: Optional[str] = None):
+    """
+    Upsert HED (Human Equivalent Dose) assessment data to Neo4j.
+    
+    Creates/updates:
+    - HEDAssessment node with toxicological safety calculations
+    - Links to Ingredient node via HAS_HED_ASSESSMENT relationship
+    
+    Args:
+        inci_name: INCI name of the ingredient
+        neo4j_hed_data: HED data from HEDIntegrationService.prepare_neo4j_data()
+        ingredient_key: Optional ingredient key (from upsert_ingredient_from_identity)
+    """
+    if not neo4j_hed_data.get("hed_available"):
+        # No HED data available - optionally record this
+        return
+    
+    # Add timestamp
+    timestamp = datetime.utcnow().isoformat()
+    
+    await neo4j_client.run("""
+    // Find existing ingredient by inci name (case-insensitive)
+    MATCH (i:Ingredient)
+    WHERE toLower(i.inci) = toLower($inci_name)
+    
+    // Create/Update HED Assessment node (unique per ingredient)
+    MERGE (h:HEDAssessment {ingredient_key: i.key})
+    SET h.dtxsid = $dtxsid,
+        h.hed_mg_kg = $hed_mg_kg,
+        h.total_safe_dose_mg = $total_safe_dose_mg,
+        h.calculation_method = $calculation_method,
+        h.source_toxicity_type = $source_toxicity_type,
+        h.source_animal_species = $source_animal_species,
+        h.source_route = $source_route,
+        h.source_effect = $source_effect,
+        h.source_value_mg_kg = $source_value_mg_kg,
+        h.safe_concentration_percent = $safe_concentration_percent,
+        h.max_dermal_application_mg = $max_dermal_application_mg,
+        h.safety_factor = $safety_factor,
+        h.risk_assessment = $risk_assessment,
+        h.recommendation = $recommendation,
+        h.total_hed_calculations = $total_hed_calculations,
+        h.relevant_entries = $relevant_entries,
+        h.last_updated = $timestamp
+    
+    // Link ingredient to HED assessment
+    MERGE (i)-[:HAS_HED_ASSESSMENT]->(h)
+    
+    // Create/Link to Risk Assessment effect
+    WITH i, h, $risk_assessment AS risk_level
+    MERGE (e:Effect {name: 'hed_safety_threshold'})
+    SET e.description = 'Human Equivalent Dose safety threshold from animal toxicology'
+    MERGE (h)-[:ASSESSED_AS {level: risk_level}]->(e)
+    """, {
+        "inci_name": inci_name,
+        "dtxsid": neo4j_hed_data.get("dtxsid"),
+        "hed_mg_kg": neo4j_hed_data.get("hed_mg_kg"),
+        "total_safe_dose_mg": neo4j_hed_data.get("total_safe_dose_mg"),
+        "calculation_method": neo4j_hed_data.get("calculation_method"),
+        "source_toxicity_type": neo4j_hed_data.get("source_toxicity_type"),
+        "source_animal_species": neo4j_hed_data.get("source_animal_species"),
+        "source_route": neo4j_hed_data.get("source_route"),
+        "source_effect": neo4j_hed_data.get("source_effect"),
+        "source_value_mg_kg": neo4j_hed_data.get("source_value_mg_kg"),
+        "safe_concentration_percent": neo4j_hed_data.get("safe_concentration_percent"),
+        "max_dermal_application_mg": neo4j_hed_data.get("max_dermal_application_mg"),
+        "safety_factor": neo4j_hed_data.get("safety_factor"),
+        "risk_assessment": neo4j_hed_data.get("risk_assessment"),
+        "recommendation": neo4j_hed_data.get("recommendation"),
+        "total_hed_calculations": neo4j_hed_data.get("total_hed_calculations"),
+        "relevant_entries": neo4j_hed_data.get("relevant_entries"),
+        "timestamp": timestamp,
+    })
+
+
+async def upsert_ingredient_with_hed(result: ChemicalIdentityResult, neo4j_hed_data: Optional[Dict[str, Any]] = None):
+    """
+    Upsert ingredient from ChemicalIdentityResult and optionally add HED assessment.
+    
+    This is a convenience method that combines:
+    1. upsert_ingredient_from_identity() - adds basic ingredient + hazards
+    2. upsert_hed_assessment() - adds HED toxicology assessment
+    
+    Args:
+        result: ChemicalIdentityResult from scraping process
+        neo4j_hed_data: Optional HED data from HEDIntegrationService
+    """
+    # First, upsert basic ingredient data
+    await upsert_ingredient_from_identity(result)
+    
+    # Then, add HED assessment if available
+    if neo4j_hed_data and neo4j_hed_data.get("hed_available"):
+        await upsert_hed_assessment(result.inci_name, neo4j_hed_data)
 
 async def upsert_user_profile(user_email: str, conditions: List[str]):
     await neo4j_client.run("""
