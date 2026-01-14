@@ -244,12 +244,80 @@ async def upsert_ingredient_with_hed(result: ChemicalIdentityResult, neo4j_hed_d
     if neo4j_hed_data and neo4j_hed_data.get("hed_available"):
         await upsert_hed_assessment(result.inci_name, neo4j_hed_data)
 
-async def upsert_user_profile(user_email: str, conditions: List[str]):
+async def upsert_user_profile(user_email: str, conditions: List[str] = None, profile_data: dict = None):
+    """
+    Upsert user profile to Neo4j with comprehensive data.
+    
+    Args:
+        user_email: User identifier
+        conditions: Legacy conditions list (for backward compatibility)
+        profile_data: Full user profile dict from MongoDB
+    """
+    # Build profile properties from profile_data if provided
+    profile_props = {} # TODO - do we need the new dictionary profile_props if we only map data from profile_data?
+    if profile_data:
+        # Physiological
+        if profile_data.get("age"): profile_props["age"] = profile_data["age"]
+        if profile_data.get("gender"): profile_props["gender"] = profile_data["gender"]
+        if profile_data.get("weight"): profile_props["weight"] = profile_data["weight"]
+        if profile_data.get("height"): profile_props["height"] = profile_data["height"]
+        
+        # Skin type
+        if profile_data.get("skinType"): profile_props["skinType"] = profile_data["skinType"]
+        if profile_data.get("sensitiveSkin") is not None: profile_props["sensitiveSkin"] = profile_data["sensitiveSkin"]
+        if profile_data.get("atopicSkin") is not None: profile_props["atopicSkin"] = profile_data["atopicSkin"]
+        if profile_data.get("acneProne") is not None: profile_props["acneProne"] = profile_data["acneProne"]
+        if profile_data.get("barrierDysfunction") is not None: profile_props["barrierDysfunction"] = profile_data["barrierDysfunction"]
+        if profile_data.get("seborrheicDermatitis") is not None: profile_props["seborrheicDermatitis"] = profile_data["seborrheicDermatitis"]
+        
+        # Allergies and intolerances
+        if profile_data.get("cosmeticAllergies"): profile_props["cosmeticAllergies"] = profile_data["cosmeticAllergies"]
+        if profile_data.get("generalAllergies"): profile_props["generalAllergies"] = profile_data["generalAllergies"]
+        if profile_data.get("knownIntolerances"): profile_props["knownIntolerances"] = profile_data["knownIntolerances"]
+        if profile_data.get("dermatologistRecommendedAvoid"): profile_props["dermatologistRecommendedAvoid"] = profile_data["dermatologistRecommendedAvoid"]
+        
+        # Medications
+        if profile_data.get("photosensitizingMedications"): profile_props["photosensitizingMedications"] = profile_data["photosensitizingMedications"]
+        if profile_data.get("diureticMedications"): profile_props["diureticMedications"] = profile_data["diureticMedications"]
+        if profile_data.get("retinoidTherapy") is not None: profile_props["retinoidTherapy"] = profile_data["retinoidTherapy"]
+        if profile_data.get("corticosteroidUse"): profile_props["corticosteroidUse"] = profile_data["corticosteroidUse"]
+        if profile_data.get("immunosuppressants"): profile_props["immunosuppressants"] = profile_data["immunosuppressants"]
+        if profile_data.get("hormonalTherapy"): profile_props["hormonalTherapy"] = profile_data["hormonalTherapy"]
+        
+        # Cosmetic exposure
+        if profile_data.get("productUsageFrequency"): profile_props["productUsageFrequency"] = profile_data["productUsageFrequency"]
+        if profile_data.get("typicalApplicationAreas"): profile_props["typicalApplicationAreas"] = profile_data["typicalApplicationAreas"]
+        if profile_data.get("preferredProductTypes"): profile_props["preferredProductTypes"] = profile_data["preferredProductTypes"]
+        
+        # Preferences
+        if profile_data.get("preferNatural") is not None: profile_props["preferNatural"] = profile_data["preferNatural"]
+        if profile_data.get("veganOnly") is not None: profile_props["veganOnly"] = profile_data["veganOnly"]
+        if profile_data.get("fragranceFree") is not None: profile_props["fragranceFree"] = profile_data["fragranceFree"]
+        if profile_data.get("avoidCategories"): profile_props["avoidCategories"] = profile_data["avoidCategories"]
+        
+        # Environment
+        if profile_data.get("climateType"): profile_props["climateType"] = profile_data["climateType"]
+        if profile_data.get("pollutionExposure"): profile_props["pollutionExposure"] = profile_data["pollutionExposure"]
+        if profile_data.get("sunExposure"): profile_props["sunExposure"] = profile_data["sunExposure"]
+        if profile_data.get("waterHardness"): profile_props["waterHardness"] = profile_data["waterHardness"]
+    
+    # Create/update User and UserProfile nodes
     await neo4j_client.run("""
     MERGE (u:User {email: $email})
     SET u.id = $email
+    
+    // Create/update UserProfile node with all properties
+    MERGE (u)-[:HAS_PROFILE]->(up:UserProfile {user_email: $email})
+    SET up += $profile_props
+    
+    // Handle conditions (legacy support)
     WITH u, $conds AS cs
+    WHERE cs IS NOT NULL AND size(cs) > 0
     UNWIND cs AS c
       MERGE (cond:Condition {name: c})
       MERGE (u)-[:HAS_CONDITION]->(cond)
-    """, {"email": user_email, "conds": conditions})
+    """, {
+        "email": user_email,
+        "conds": conditions or [],
+        "profile_props": profile_props
+    })

@@ -14,6 +14,7 @@ from app.service.neo4j_sync_service import upsert_ingredient_from_identity, upse
 from app.service.hed_integration_service import HEDIntegrationService
 from ..core.auth import get_current_user
 from ..core.database import users_collection
+from ..core.neo4j_client import neo4j_client
 from ..service.ingredients_cleaner import IngredientsCleaner
 from ..service.chemical_identity_mapper import ChemicalIdentityMapper
 from ..prettier import save_analysis_results
@@ -230,6 +231,14 @@ async def map_chemical_identities(
                    else f"cas:{cd.basic_identifiers.cas_number}" if cd and cd.basic_identifiers and cd.basic_identifiers.cas_number
                    else f"dtxsid:{cd.toxicology.dtxsid}" if cd and cd.toxicology and cd.toxicology.dtxsid
                    else f"inci:{r.inci_name.lower()}")
+            
+            # For unmapped ingredients, create basic Ingredient node with inci name
+            if not r.found or not cd:
+                await neo4j_client.run("""
+                MERGE (i:Ingredient {key: $key})
+                SET i.inci = $inci_name
+                """, {"key": key, "inci_name": r.inci_name})
+            
             ing_keys.append(key)
         except Exception as e:
             logger.error(f"Failed to process {r.inci_name}: {e}")
@@ -237,11 +246,25 @@ async def map_chemical_identities(
     product_id = f"tmp-{uuid.uuid4()}"
     await upsert_product(product_id, ing_keys)
 
-    # Mapuj profil użytkownika -> conditions (przykład MVP)
+    # Send full user profile to Neo4j for decision engine
+    user_profile = await users_collection.find_one({"email": current_user["email"]})
+    
+    # Legacy conditions mapping (for backward compatibility with Condition nodes)
     conditions = []
-    if current_user.get("sensitiveSkin"): conditions.append("sensitive_skin")
-    if current_user.get("hasAllergies"): conditions.append("allergies")
-    await upsert_user_profile(current_user["email"], conditions)
+    if user_profile:
+        if user_profile.get("sensitiveSkin"): conditions.append("sensitive_skin")
+        if user_profile.get("hasAllergies"): conditions.append("allergies")
+        if user_profile.get("acneVulgaris"): conditions.append("acne_vulgaris")
+        if user_profile.get("psoriasis"): conditions.append("psoriasis")
+        if user_profile.get("eczema"): conditions.append("eczema")
+        if user_profile.get("rosacea"): conditions.append("rosacea")
+    
+    # Upsert full profile to Neo4j (for advanced decision engine)
+    await upsert_user_profile(
+        current_user["email"], 
+        conditions=conditions,
+        profile_data=user_profile
+    )
 
     decision = await decide_product(current_user["email"], product_id, preferred_routes=["dermal"])
 
@@ -256,7 +279,9 @@ async def map_chemical_identities(
         "hed_details": hed_summaries,
     }
     
+    # TODO - save only in debug mode
     save_analysis_results(info)
+    save_analysis_results(decision, prefix="decision_result")  # Save decision separately for debugging
 
     logger.info(f"Mapping complete: {len(mapping_results)} ingredients, {hed_calculated_count} with HED")
     return {"mapping": info, "decision": decision}
