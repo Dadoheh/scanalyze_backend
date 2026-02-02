@@ -160,7 +160,8 @@ class DecisionEngine:
              coalesce(up.veganOnly, false) AS vegan_only,
              coalesce(up.preferNatural, false) AS prefer_natural,
              coalesce(up.sunExposure, 'moderate') AS sun_exposure,
-             coalesce(up.pollutionExposure, 'moderate') AS pollution_exposure
+             coalesce(up.pollutionExposure, 'moderate') AS pollution_exposure,
+             coalesce(up.climateType, 'temperate') AS climate_type
         
         // 7. Calculate risk components
         WITH i, hed, hazards, conditions,
@@ -168,7 +169,7 @@ class DecisionEngine:
              photosensitizing_meds, retinoid_therapy, corticosteroid_use,
              barrier_dysfunction, sensitive_skin, atopic_skin, acne_prone,
              avoid_categories, fragrance_free, vegan_only, prefer_natural,
-             sun_exposure, pollution_exposure,
+             sun_exposure, pollution_exposure, climate_type,
              
              // BLACKLIST CHECK (absolute priority)
              CASE 
@@ -250,6 +251,34 @@ class DecisionEngine:
                       (toLower(i.inci) CONTAINS 'parfum' OR toLower(i.inci) CONTAINS 'fragrance')
                  THEN 40
                  
+                 // VEGAN ONLY - detect animal-derived ingredients
+                 WHEN vegan_only AND
+                      (toLower(i.inci) CONTAINS 'lanolin' OR 
+                       toLower(i.inci) CONTAINS 'beeswax' OR
+                       toLower(i.inci) CONTAINS 'carmine' OR
+                       toLower(i.inci) CONTAINS 'collagen' OR
+                       toLower(i.inci) CONTAINS 'keratin' OR
+                       toLower(i.inci) CONTAINS 'squalene' OR
+                       toLower(i.inci) CONTAINS 'honey' OR
+                       toLower(i.inci) CONTAINS 'milk' OR
+                       toLower(i.inci) CONTAINS 'lactose' OR
+                       toLower(i.inci) CONTAINS 'shellac' OR
+                       toLower(i.inci) CONTAINS 'silk' OR
+                       toLower(i.inci) CONTAINS 'guanine')
+                 THEN 40
+                 
+                 // PREFER NATURAL - detect synthetic ingredients
+                 WHEN prefer_natural AND
+                      (toLower(i.inci) CONTAINS 'peg-' OR
+                       toLower(i.inci) CONTAINS 'ppg-' OR
+                       toLower(i.inci) CONTAINS 'edta' OR
+                       toLower(i.inci) CONTAINS 'bht' OR
+                       toLower(i.inci) = 'bha' OR
+                       toLower(i.inci) CONTAINS 'methylisothiazolinone' OR
+                       toLower(i.inci) CONTAINS 'phenoxyethanol' OR
+                       toLower(i.inci) CONTAINS 'triclosan')
+                 THEN 25
+                 
                  WHEN 'parabens' IN avoid_categories AND
                       toLower(i.inci) CONTAINS 'paraben'
                  THEN 35
@@ -260,6 +289,11 @@ class DecisionEngine:
                  
                  WHEN 'silicones' IN avoid_categories AND
                       (toLower(i.inci) CONTAINS 'siloxane' OR toLower(i.inci) CONTAINS 'dimethicone')
+                 THEN 30
+                 
+                 WHEN 'mineral_oil' IN avoid_categories AND
+                      (toLower(i.inci) CONTAINS 'mineral oil' OR toLower(i.inci) CONTAINS 'paraffin' OR
+                       toLower(i.inci) CONTAINS 'petrolatum')
                  THEN 30
                  
                  ELSE 5
@@ -274,6 +308,24 @@ class DecisionEngine:
                  WHEN sun_exposure = 'high_outdoor' AND
                       ANY(h IN hazards WHERE 'photodegradation' IN h.effects OR 'photosensitivity' IN h.effects)
                  THEN 30
+                 
+                 // HUMID CLIMATE + OCCLUSIVE ingredients = may worsen skin condition
+                 WHEN climate_type = 'humid' AND
+                      (toLower(i.inci) CONTAINS 'petrolatum' OR
+                       toLower(i.inci) CONTAINS 'mineral oil' OR
+                       toLower(i.inci) CONTAINS 'paraffin' OR
+                       toLower(i.inci) CONTAINS 'lanolin' OR
+                       toLower(i.inci) CONTAINS 'beeswax' OR
+                       toLower(i.inci) CONTAINS 'vaseline')
+                 THEN 20
+                 
+                 // DRY/COLD CLIMATE + drying alcohols = may cause irritation
+                 WHEN climate_type IN ['dry', 'cold'] AND
+                      (toLower(i.inci) = 'alcohol' OR 
+                       toLower(i.inci) = 'alcohol denat' OR
+                       toLower(i.inci) CONTAINS 'sd alcohol' OR
+                       toLower(i.inci) = 'isopropyl alcohol')
+                 THEN 25
                  
                  ELSE 5
              END AS environmental_risk_score
